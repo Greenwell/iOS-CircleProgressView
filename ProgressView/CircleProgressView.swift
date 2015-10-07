@@ -8,8 +8,12 @@
 
 import UIKit
 
-@objc @IBDesignable public class CircleProgressView: UIView {
+public protocol CircleProgressViewDelegate {
+    func circleProgressView(circleProgressView: CircleProgressView, didSelectProgress progress: Double)
+}
 
+@objc @IBDesignable public class CircleProgressView: UIView {
+    
     private struct Constants {
         let circleDegress = 360.0
         let minimumValue = 0.000001
@@ -18,10 +22,10 @@ import UIKit
         let twoSeventyDegrees = 270.0
         var contentView:UIView = UIView()
     }
-
+    
     private let constants = Constants()
     private var internalProgress:Double = 0.0
-
+    
     private var displayLink: CADisplayLink?
     private var destinationProgress: Double = 0.0
     
@@ -31,35 +35,35 @@ import UIKit
             setNeedsDisplay()
         }
     }
-
+    
     @IBInspectable public var clockwise: Bool = true {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var trackWidth: CGFloat = 10 {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var trackImage: UIImage? {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var trackBackgroundColor: UIColor = UIColor.grayColor() {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var trackFillColor: UIColor = UIColor.blueColor() {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var trackBorderColor:UIColor = UIColor.clearColor() {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var trackBorderWidth: CGFloat = 0 {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var centerFillColor: UIColor = UIColor.whiteColor() {
         didSet { setNeedsDisplay() }
     }
@@ -67,22 +71,24 @@ import UIKit
     @IBInspectable public var centerImage: UIImage? {
         didSet { setNeedsDisplay() }
     }
-
+    
     @IBInspectable public var contentView: UIView {
         return self.constants.contentView
     }
-
+    
     required override public init(frame: CGRect) {
         super.init(frame: frame)
         internalInit()
         self.addSubview(contentView)
     }
-
+    
     required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         internalInit()
         self.addSubview(contentView)
     }
+    
+    @IBInspectable public var delegate: CircleProgressViewDelegate?
     
     func internalInit() {
         displayLink = CADisplayLink(target: self, selector: Selector("displayLinkTick"))
@@ -97,8 +103,8 @@ import UIKit
         internalProgress = (internalProgress/1.0) == 0.0 ? constants.minimumValue : progress
         internalProgress = (internalProgress/1.0) == 1.0 ? constants.maximumValue : internalProgress
         internalProgress = clockwise ?
-                                (-constants.twoSeventyDegrees + ((1.0 - internalProgress) * constants.circleDegress)) :
-                                (constants.ninetyDegrees - ((1.0 - internalProgress) * constants.circleDegress))
+            (-constants.twoSeventyDegrees + ((1.0 - internalProgress) * constants.circleDegress)) :
+            (constants.ninetyDegrees - ((1.0 - internalProgress) * constants.circleDegress))
         
         let context = UIGraphicsGetCurrentContext()
         
@@ -172,7 +178,7 @@ import UIKit
     internal func displayLinkTick() {
         
         let renderTime = displayLink!.duration
-
+        
         if destinationProgress > progress {
             progress += renderTime
             if progress >= destinationProgress {
@@ -192,5 +198,18 @@ import UIKit
         }
     }
     
+    // MARK: - Detect touches and update progress
     
+    public override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
+        if let touch = touches.first {
+            let location = touch.locationInView(self)
+            print("Touched at point \(location.x), \(location.y)")
+            
+            var progressAtTouch = (1/(2*M_PI)) * Double(atan2(2*location.x/frame.size.width - 1, 1 - 2*location.y/frame.size.height))
+            if progressAtTouch < 0 { progressAtTouch = 1 + progressAtTouch }
+            
+            delegate?.circleProgressView(self, didSelectProgress: progressAtTouch)
+        }
+        super.touchesBegan(touches, withEvent: event)
+    }
 }
